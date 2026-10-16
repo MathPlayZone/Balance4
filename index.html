@@ -100,25 +100,27 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            direction: ltr;
+            direction: rtl; /* يضمن بقاء السالب على يمين الرقم تماماً */
+            gap: 1.5px;
         }
         .fraction-bottom {
             padding-top: 1.5px;
         }
 
-        /* تنسيق الجذر الرياضي المتصل تماماً */
-        .math-radical-wrapper {
+        /* تنسيق الجذر الرياضي العربي: يبدأ رمزه من اليمين ويمتد الخط لليسار */
+        .math-radical-wrapper-ar {
             display: inline-flex;
             align-items: stretch;
             vertical-align: middle;
-            direction: ltr;
+            direction: rtl;
         }
-        .math-radical-symbol {
+        .math-radical-symbol-ar {
             display: inline-flex;
             align-items: stretch;
             flex-shrink: 0;
+            transform: scaleX(-1); /* عكس الرمز ليبدأ رسمه من اليمين ويتجه لليسار */
         }
-        .math-radical-body {
+        .math-radical-body-ar {
             border-top: 2.2px solid currentColor;
             padding-top: 2px;
             padding-left: 4px;
@@ -255,6 +257,488 @@
             <div class="bg-[var(--panel-color)] border border-[var(--accent-color)]/30 rounded-2xl p-3 w-full max-w-[310px] shadow-lg text-center shrink-0 mb-3">
                 <div id="current-stage-title" class="text-[var(--accent-color)] text-[10px] font-bold uppercase mb-0.5 tracking-wider">المرحلة الأولى</div>
                 <div id="top-question-text" class="text-sm font-black text-white leading-snug"></div>
+            </div>
+
+            <!-- هيكل الميزان المتناسق مع العمود الثابت -->
+            <div class="relative w-full max-w-[270px] h-[175px] flex justify-center items-center shrink-0 my-1">
+                <!-- قاعدة الميزان -->
+                <div class="absolute bottom-1 w-28 h-2.5 bg-[var(--secondary-bg)] rounded-full"></div>
+                <!-- عمود الميزان الرأسي الثابت -->
+                <div class="absolute bottom-2 w-2.5 h-32 bg-gradient-to-t from-slate-700 via-slate-600 to-slate-400 rounded-full shadow"></div>
+                <!-- المفصل الدائري المركزي -->
+                <div class="absolute top-[26px] w-5 h-5 bg-slate-200 rounded-full z-[60] border-[3px] border-slate-600 shadow-md"></div>
+
+                <!-- عارضة الميزان والكفات الملحومة -->
+                <div id="beam-wrapper" class="absolute top-[34px] w-full beam-transition z-30" style="transform: rotate(-10deg); transform-origin: center center;">
+                    <div class="w-full h-1.5 bg-gradient-to-b from-slate-300 to-slate-600 rounded-full relative shadow">
+                        <!-- كفة المسألة (اليسرى) -->
+                        <div class="welded-ring left-[8%]">
+                            <div id="pan-left-container" class="pan-counter-rotation flex flex-col items-center" style="transform: rotate(10deg); transform-origin: center 6px;">
+                                <div class="integrated-cord !h-[62px]"></div>
+                                <div class="w-24 min-h-[66px] px-2 bg-[var(--panel-color)] border-2 border-blue-500/40 rounded-b-[32px] flex flex-col items-center justify-center p-1.5 shadow-2xl backdrop-blur-sm translate-y-[62px]">
+                                    <span class="text-[8px] text-blue-400 font-black mb-0.5 opacity-70">المسألة</span>
+                                    <div id="pan-question-mini" class="pan-text-centered text-[11px] font-black text-white"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- كفة الاختيار (اليمنى) -->
+                        <div class="welded-ring right-[8%]">
+                            <div id="pan-right-container" class="pan-counter-rotation flex flex-col items-center" style="transform: rotate(10deg); transform-origin: center 6px;">
+                                <div class="integrated-cord !h-[62px]"></div>
+                                <div id="answer-box" class="w-24 min-h-[66px] px-2 bg-[var(--panel-color)] border-2 border-emerald-500/20 rounded-b-[32px] flex flex-col items-center justify-center p-1.5 shadow-2xl backdrop-blur-sm translate-y-[62px]">
+                                    <span class="text-[8px] text-emerald-400 font-black mb-0.5 opacity-70">اختيارك</span>
+                                    <div id="answer-text" class="pan-text-centered text-sm font-black text-white">؟</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="feedback" class="h-5 flex items-center justify-center text-xs font-black shrink-0 mt-1"></div>
+        </div>
+
+        <!-- لوحة الخيارات السفلية -->
+        <div class="bg-[var(--panel-color)] p-3 pb-5 rounded-t-[2rem] border-t border-white/5 shadow-2xl shrink-0 z-[120]">
+            <div class="flex justify-between items-center mb-2 px-1 max-w-sm mx-auto">
+                <span class="text-slate-400 text-[10px] font-bold">السؤال <span id="q-idx-label">١</span> / <span id="total-q-label">٥</span></span>
+                <span class="text-slate-400 text-[10px] font-bold">انقري لاختيار الإجابة وموازنة الكفة</span>
+            </div>
+
+            <!-- أزرار الخيارات أ / ب / ج -->
+            <div class="space-y-2 mb-3 max-w-sm mx-auto" id="options-container"></div>
+
+            <div class="flex gap-2 max-w-sm mx-auto">
+                <button onclick="clearSelection()" class="w-1/4 h-11 bg-slate-700/50 hover:bg-slate-700/80 rounded-xl font-bold text-xs active:scale-95 border border-white/5 text-white">إلغاء</button>
+                <button id="check-btn" onclick="checkAnswer()" class="flex-1 h-11 rounded-xl font-black text-sm transition-all active:scale-95 shadow-md border border-white/10 text-white" disabled>تحقق من التوازن ⚖️</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة الفوز بالمرحلة -->
+    <div id="win-modal" class="fixed inset-0 z-[600] hidden items-center justify-center p-6 bg-black/95 backdrop-blur-xl text-white">
+        <div class="text-center p-6 w-full max-w-sm">
+            <div class="text-6xl mb-4 animate-bounce">🏆</div>
+            <h2 class="text-3xl font-black mb-2 text-white">ممتاز جداً!</h2>
+            <p class="text-slate-300 text-sm mb-8 leading-relaxed">لقد قمتِ بموازنة جميع المسائل بنجاح وتفوق ✨</p>
+            <button onclick="closeWinModalAndGoBack()" class="px-12 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-base shadow-xl w-full active:scale-95">العودة للمراحل</button>
+        </div>
+    </div>
+
+    <script>
+        // دالة تحويل الأرقام إلى عربية
+        const toAr = (n) => n.toString().replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]);
+
+        // ثيمات الألوان
+        const themes = {
+            dark: { bg: '#0a0f1e', panel: '#151b2d', secondary: '#1f2943', accent: '#3b82f6' },
+            royal: { bg: '#2e1065', panel: '#4c1d95', secondary: '#5b21b6', accent: '#a78bfa' },
+            emerald: { bg: '#064e3b', panel: '#065f46', secondary: '#047857', accent: '#34d399' },
+            rose: { bg: '#831843', panel: '#9d174d', secondary: '#be123c', accent: '#fb7185' },
+            midnight: { bg: '#1e1b4b', panel: '#312e81', secondary: '#3730a3', accent: '#6366f1' },
+            sunset: { bg: '#7c2d12', panel: '#9a3412', secondary: '#af3a03', accent: '#fb923c' },
+            ocean: { bg: '#0c4a6e', panel: '#075985', secondary: '#0369a1', accent: '#38bdf8' },
+            lavender: { bg: '#4c1d95', panel: '#5b21b6', secondary: '#6d28d9', accent: '#c084fc' }
+        };
+
+        // مساعدة في تنسيق الكسر الرياضي مع التأكيد على وضع السالب يمين الرقم
+        function makeFrac(top, bottom) {
+            return `<span class="fraction"><span class="fraction-top">${top}</span><span class="fraction-bottom">${bottom}</span></span>`;
+        }
+
+        // مساعدة في رسم الجذر الرياضي العربي: يبدأ رمزه من جهة اليمين ويمتد يساراً
+        function makeSqrt(content) {
+            return `
+                <span class="math-radical-wrapper-ar">
+                    <svg class="math-radical-symbol-ar" width="13" height="34" viewBox="0 0 13 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 18 L3.5 16 L6.5 31 L12.5 1.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span class="math-radical-body-ar">${content}</span>
+                </span>
+            `;
+        }
+
+        // بيانات المراحل والأسئلة (مع وضع السالب على يمين العدد: - ١٠ ، - ٥ ، - ٨ ، - ١ ، - ٣ ، - ٧)
+        const levelsData = {
+            1: {
+                title: "ألغاز الرياضيات",
+                questions: [
+                    {
+                        q: "أي الأعداد الآتية مربع كامل؟",
+                        mini: "مربع كامل؟",
+                        options: [
+                            { key: "أ", text: "١٠", value: "10" },
+                            { key: "ب", text: "١٦", value: "16" },
+                            { key: "ج", text: "٢٠", value: "20" }
+                        ],
+                        correct: "16"
+                    },
+                    {
+                        q: "ما اسم العدد الذي يمكن كتابته على صورة كسر من عددين صحيحين؟",
+                        mini: "كسر عددين<br>صحيحين",
+                        options: [
+                            { key: "أ", text: "عدد نسبي", value: "rational" },
+                            { key: "ب", text: "عدد غير نسبي", value: "irrational" },
+                            { key: "ج", text: "عدد سالب فقط", value: "negative" }
+                        ],
+                        correct: "rational"
+                    },
+                    {
+                        q: "ما اسم أطول ضلع في المثلث القائم الزاوية؟",
+                        mini: "أطول ضلع",
+                        options: [
+                            { key: "أ", text: "القاعدة", value: "base" },
+                            { key: "ب", text: "الارتفاع", value: "height" },
+                            { key: "ج", text: "الوتر", value: "hypotenuse" }
+                        ],
+                        correct: "hypotenuse"
+                    },
+                    {
+                        q: "ما اسم نقطة التقاء المحور السيني والمحور الصادي؟",
+                        mini: "نقطة التقاء<br>المحورين",
+                        options: [
+                            { key: "أ", text: "نقطة المنتصف", value: "midpoint" },
+                            { key: "ب", text: "نقطة الأصل", value: "origin" },
+                            { key: "ج", text: "نقطة النهاية", value: "endpoint" }
+                        ],
+                        correct: "origin"
+                    },
+                    {
+                        q: "ما العدد الذي جذره التربيعي يساوي ٥؟",
+                        mini: "جذره = ٥",
+                        options: [
+                            { key: "أ", text: "١٠", value: "10" },
+                            { key: "ب", text: "٢٥", value: "25" },
+                            { key: "ج", text: "٣٠", value: "30" }
+                        ],
+                        correct: "25"
+                    }
+                ]
+            },
+            2: {
+                title: "المسائل الرياضية",
+                questions: [
+                    {
+                        q: `قارني بين الكسرين بوضع الإشارة المناسبة:<br><div class="comparison-container mt-2">${makeFrac('-١٠', '١٨')} <span class="comparison-box">؟</span> ${makeFrac('-١٦', '١٨')}</div>`,
+                        mini: `<div class="comparison-container !gap-2">${makeFrac('-١٠', '١٨')} <span class="comparison-box !w-5 !h-5 !text-[10px]">؟</span> ${makeFrac('-١٦', '١٨')}</div>`,
+                        options: [
+                            { key: "أ", text: "أكبر من ( > )", panText: ">", value: ">" },
+                            { key: "ب", text: "أصغر من ( < )", panText: "<", value: "<" },
+                            { key: "ج", text: "يساوي ( = )", panText: "=", value: "=" }
+                        ],
+                        correct: ">"
+                    },
+                    {
+                        q: `ما هو النظير الضربي للعدد النسبي ${makeFrac('-٥', '٨')} ؟`,
+                        mini: `نظير ${makeFrac('-٥', '٨')}`,
+                        options: [
+                            { key: "أ", text: makeFrac('-٨', '٥'), value: "-8/5" },
+                            { key: "ب", text: makeFrac('-٥', '٨'), value: "-5/8" },
+                            { key: "ج", text: makeFrac('٥', '٨'), value: "5/8" }
+                        ],
+                        correct: "-8/5"
+                    },
+                    {
+                        q: "ما هو النظير الضربي للعدد ١٥ ؟",
+                        mini: "نظير ١٥",
+                        options: [
+                            { key: "أ", text: makeFrac('١٥', '١'), value: "15/1" },
+                            { key: "ب", text: makeFrac('-١', '١٥'), value: "-1/15" },
+                            { key: "ج", text: makeFrac('١', '١٥'), value: "1/15" }
+                        ],
+                        correct: "1/15"
+                    },
+                    {
+                        q: `أوجدي ناتج الضرب في أبسط صورة:<br><div class="mt-2 inline-flex items-center gap-2">(${makeFrac('-١', '٣')}) × ${makeFrac('٧', '٨')}</div>`,
+                        mini: `<div class="pan-math-horizontal text-[10px]">(${makeFrac('-١', '٣')}) × ${makeFrac('٧', '٨')}</div>`,
+                        options: [
+                            { key: "أ", text: makeFrac('٧', '٢٤'), value: "7/24" },
+                            { key: "ب", text: makeFrac('٢٤', '٧'), value: "24/7" },
+                            { key: "ج", text: makeFrac('-٧', '٢٤'), value: "-7/24" }
+                        ],
+                        correct: "-7/24"
+                    },
+                    {
+                        q: `أوجدي الجذر التربيعي للكسر الآتي:<br><div class="mt-2">${makeSqrt(makeFrac('٩', '١٦'))}</div>`,
+                        mini: `${makeSqrt(makeFrac('٩', '١٦'))}`,
+                        options: [
+                            { key: "أ", text: makeFrac('-٣', '٤'), value: "-3/4" },
+                            { key: "ب", text: makeFrac('٣', '٤'), value: "3/4" },
+                            { key: "ج", text: makeFrac('٤', '٣'), value: "4/3" }
+                        ],
+                        correct: "3/4"
+                    }
+                ]
+            }
+        };
+
+        const storageKey = 'mathScale_Nibras_2026_Full';
+        window.score = 0;
+        window.unlockedStages = [1];
+        let currentLevel = 1, qIdx = 0, selectedOption = null, isCorrect = false;
+
+        // إدارة التخزين المحلي
+        function saveProgress() {
+            localStorage.setItem(storageKey, JSON.stringify({ score: window.score, unlocked: window.unlockedStages }));
+        }
+
+        function loadProgress() {
+            const saved = localStorage.getItem(storageKey);
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    window.score = data.score || 0;
+                    window.unlockedStages = data.unlocked || [1];
+                } catch(e) {
+                    window.score = 0;
+                    window.unlockedStages = [1];
+                }
+            }
+            updateGlobalScore(window.score);
+            renderStages();
+        }
+
+        function fillThemes() {
+            ['home-themes', 'stages-themes', 'game-themes'].forEach(id => {
+                const bar = document.getElementById(id);
+                if (!bar) return;
+                bar.innerHTML = '';
+                Object.keys(themes).forEach(t => {
+                    bar.innerHTML += `<div onclick="setTheme('${t}')" class="theme-dot" style="background: ${themes[t].bg}"></div>`;
+                });
+            });
+        }
+
+        function setTheme(n) {
+            const t = themes[n]; const r = document.documentElement;
+            r.style.setProperty('--bg-color', t.bg); r.style.setProperty('--panel-color', t.panel);
+            r.style.setProperty('--secondary-bg', t.secondary); r.style.setProperty('--accent-color', t.accent);
+            updateScale();
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if (id === 'screen-stages') {
+                updateGlobalScore(window.score);
+                renderStages();
+            }
+        }
+
+        function renderStages() {
+            const grid = document.getElementById('stages-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            
+            Object.keys(levelsData).forEach(id => {
+                const numId = parseInt(id);
+                const isUnlocked = window.unlockedStages.includes(numId);
+                const title = levelsData[id].title;
+                
+                grid.innerHTML += `
+                    <div onclick="handleStageClick(${numId}, 100)" class="bg-[var(--panel-color)] p-4 rounded-2xl border-2 ${isUnlocked ? 'border-[var(--accent-color)]/50 opacity-100' : 'border-white/5 opacity-60'} flex justify-between items-center active:scale-95 transition-all mb-3 cursor-pointer shadow-md">
+                        <div>
+                            <h3 class="font-black text-base ${isUnlocked ? 'text-white' : 'text-slate-400'}">المرحلة ${toAr(id)}: ${title}</h3>
+                            <p class="text-[10px] ${isUnlocked ? 'text-emerald-400' : 'text-amber-500'} font-bold mt-0.5">
+                                ${isUnlocked ? 'مفتوحة وجاهزة' : 'تحتاج ١٠٠ نقطة للفتح'}
+                            </p>
+                        </div>
+                        <span class="${isUnlocked ? 'text-[var(--accent-color)]' : 'text-slate-500'} text-lg font-bold">${isUnlocked ? '▶' : '🔒'}</span>
+                    </div>
+                `;
+            });
+
+            // المرحلة القادمة
+            grid.innerHTML += `
+                <div class="bg-[var(--panel-color)]/20 p-4 rounded-2xl border-2 border-dashed border-white/5 flex justify-between items-center opacity-40 mb-3 cursor-default">
+                    <div>
+                        <h3 class="font-black text-base text-slate-500">المرحلة ٣: قريباً..</h3>
+                    </div>
+                    <span class="text-slate-600 text-lg">⏳</span>
+                </div>
+            `;
+        }
+
+        function updateGlobalScore(s) {
+            document.getElementById('global-score-display').innerText = toAr(s);
+            const sEl = document.getElementById('score');
+            if (sEl) sEl.innerText = toAr(s);
+        }
+
+        function handleStageClick(id, req) {
+            if (window.unlockedStages.includes(id)) {
+                startLevel(id);
+            } else if (window.score >= req) {
+                window.score -= req;
+                window.unlockedStages.push(id);
+                saveProgress();
+                updateGlobalScore(window.score);
+                renderStages();
+                startLevel(id);
+            }
+        }
+
+        function startLevel(id) {
+            if (!levelsData[id]) return;
+            currentLevel = id; qIdx = 0;
+            document.getElementById('current-stage-title').innerText = `المرحلة ${toAr(id)}: ${levelsData[id].title}`;
+            document.getElementById('total-q-label').innerText = toAr(levelsData[id].questions.length);
+            loadQuestion();
+            showScreen('screen-game');
+        }
+
+        function loadQuestion() {
+            selectedOption = null; isCorrect = false;
+            const q = levelsData[currentLevel].questions[qIdx];
+            document.getElementById('top-question-text').innerHTML = q.q;
+            document.getElementById('pan-question-mini').innerHTML = q.mini;
+            document.getElementById('q-idx-label').innerText = toAr(qIdx + 1);
+            
+            const ansBox = document.getElementById('answer-box');
+            if (ansBox) ansBox.classList.replace('border-emerald-500', 'border-emerald-500/20');
+            
+            document.getElementById('feedback').innerHTML = '';
+            renderOptions(q.options);
+            updateScale();
+        }
+
+        function renderOptions(options) {
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+            
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = "w-full p-2.5 rounded-xl border border-white/10 bg-[var(--secondary-bg)] hover:bg-white/10 flex justify-between items-center transition-all text-white";
+                btn.onclick = () => selectOption(opt);
+                btn.id = `opt-btn-${opt.value}`;
+                btn.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-lg bg-white/10 flex items-center justify-center text-xs font-black text-amber-400">${opt.key}</span>
+                        <span class="text-xs font-bold">${opt.text}</span>
+                    </div>
+                    <span class="text-[9px] text-slate-400">انقري للاختيار</span>
+                `;
+                container.appendChild(btn);
+            });
+        }
+
+        function selectOption(opt) {
+            if (isCorrect) return;
+            selectedOption = opt;
+            
+            const container = document.getElementById('options-container');
+            Array.from(container.children).forEach(b => {
+                b.classList.remove('border-blue-500', 'bg-blue-600/20');
+            });
+            const activeBtn = document.getElementById(`opt-btn-${opt.value}`);
+            if (activeBtn) activeBtn.classList.add('border-blue-500', 'bg-blue-600/20');
+
+            updateScale();
+        }
+
+        function clearSelection() {
+            if (isCorrect) return;
+            selectedOption = null;
+            const container = document.getElementById('options-container');
+            Array.from(container.children).forEach(b => b.classList.remove('border-blue-500', 'bg-blue-600/20'));
+            updateScale();
+        }
+
+        function updateScale() {
+            const beam = document.getElementById('beam-wrapper');
+            const panL = document.getElementById('pan-left-container');
+            const panR = document.getElementById('pan-right-container');
+            const answerDisplay = document.getElementById('answer-text');
+            const btn = document.getElementById('check-btn');
+            if (!beam || !btn) return;
+
+            // كفة الاختيار باليمين
+            if (selectedOption) {
+                answerDisplay.innerHTML = selectedOption.panText || selectedOption.text;
+                if (selectedOption.panText) {
+                    answerDisplay.className = "pan-text-centered text-2xl font-black text-white leading-none";
+                } else {
+                    answerDisplay.className = "pan-text-centered text-xs font-black text-white";
+                }
+            } else {
+                answerDisplay.innerHTML = "؟";
+                answerDisplay.className = "pan-text-centered text-sm font-black text-white";
+            }
+
+            let tilt = -10; // مائل لليسار لوجود المسألة
+
+            if (selectedOption && !isCorrect) {
+                tilt = 8;
+                btn.disabled = false;
+                btn.style.background = 'var(--accent-color)';
+                btn.style.borderColor = 'rgba(255,255,255,0.3)';
+                btn.style.color = 'white';
+                btn.innerText = "تحقق من التوازن ⚖️";
+            } else if (isCorrect) {
+                tilt = 0;
+                btn.disabled = true;
+                btn.style.background = '#059669';
+                btn.style.borderColor = '#10b981';
+                btn.innerText = "متوازن تماماً! ✅";
+            } else {
+                tilt = -10;
+                btn.disabled = true;
+                btn.style.background = 'var(--secondary-bg)';
+                btn.style.borderColor = 'rgba(255,255,255,0.05)';
+                btn.style.color = 'rgba(255,255,255,0.25)';
+                btn.innerText = "تحقق من التوازن ⚖️";
+            }
+
+            beam.style.transform = `rotate(${tilt}deg)`;
+            panL.style.transform = `rotate(${-tilt}deg)`;
+            panR.style.transform = `rotate(${-tilt}deg)`;
+        }
+
+        function checkAnswer() {
+            if (!selectedOption) return;
+            const q = levelsData[currentLevel].questions[qIdx];
+            const feedback = document.getElementById('feedback');
+            const ansBox = document.getElementById('answer-box');
+
+            if (selectedOption.value === q.correct) {
+                isCorrect = true;
+                window.score += 20;
+                updateGlobalScore(window.score);
+                saveProgress();
+
+                if (ansBox) ansBox.classList.replace('border-emerald-500/20', 'border-emerald-500');
+                feedback.innerHTML = `<span class="text-emerald-400 font-bold animate-bounce">✅ أحسنتِ! اتزنت كفتا الميزان بدقة</span>`;
+                updateScale();
+
+                setTimeout(() => {
+                    qIdx++;
+                    if (qIdx < levelsData[currentLevel].questions.length) {
+                        loadQuestion();
+                    } else {
+                        document.getElementById('win-modal').style.display = 'flex';
+                    }
+                }, 1400);
+            } else {
+                feedback.innerHTML = `<span class="text-rose-400 font-bold animate-pulse">❌ غير متوازن.. حاولي مرة أخرى</span>`;
+                const beam = document.getElementById('beam-wrapper');
+                beam.style.transform = `rotate(14deg)`;
+                setTimeout(() => updateScale(), 400);
+            }
+        }
+
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        function closeWinModalAndGoBack() { closeModal('win-modal'); showScreen('screen-stages'); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadProgress();
+            fillThemes();
+            updateScale();
+        });
+    </script>
+</body>
+</html>
+
+top-question-text" class="text-sm font-black text-white leading-snug"></div>
             </div>
 
             <!-- هيكل الميزان المتناسق مع العمود الثابت -->
